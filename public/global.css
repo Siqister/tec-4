@@ -1,0 +1,13 @@
+body{
+	background:rgb(252,252,252);
+	font-family:'Roboto Condensed', sans-serif;
+}
+
+
+.control{
+	height:100px;
+	border-bottom:1px solid rgb(150,150,150);
+}
+.plot{
+	min-height:1200px;
+}

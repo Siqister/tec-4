@@ -1,0 +1,15 @@
+{
+  "name": "tec-4-data",
+  "version": "1.0.0",
+  "description": "ITESM 4 Campuses data analysis and visualization sketches",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "d3": "^3.5.15",
+    "express": "^4.13.4"
+  }
+}
