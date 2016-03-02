@@ -9,7 +9,9 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "bootstrap": "^3.3.6",
     "d3": "^3.5.15",
+    "d3-queue": "^2.0.2",
     "express": "^4.13.4"
   }
 }
