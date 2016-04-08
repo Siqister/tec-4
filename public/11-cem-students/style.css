@@ -1,0 +1,21 @@
+.container .plot{
+    min-height:1000px;
+    height:1000px;
+}
+
+/* cluster */
+.node{
+	fill:white;
+	stroke:black;
+	stroke-width:1px;
+}
+.link{
+	fill:none;
+	stroke:black;
+	stroke-opacity:.1;
+}
+.node text{
+	font-size:10px;
+	stroke:none;
+	fill:black;
+}
