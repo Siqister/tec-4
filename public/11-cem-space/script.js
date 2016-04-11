@@ -153,12 +153,6 @@ function dataLoaded(err, rows){
         .append('text')
         .text(function(d){return d.key});
 
-
-
-
-
-
-
 }
 
 function parse(d){

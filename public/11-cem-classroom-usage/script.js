@@ -1,4 +1,4 @@
-console.log("Classroom size and capacity");
+console.log("CEM instructional space usage");
 console.log(d3);
 
 var m = {t:100,r:50,b:100,l:50},
@@ -10,8 +10,8 @@ var m = {t:100,r:50,b:100,l:50},
 	w1 = w - x2,
 	dayPadding = 40,
 	bldgPadding = 5,
-	days = 6,
-	t0 = 7, t1 = 22;
+	days = 6, //show Mon to Sat
+	t0 = 7, t1 = 22; //show 7AM to 10PM
 
 var svg = d3.select('.plot').append('svg')
 	.attr({
@@ -22,12 +22,11 @@ var svg = d3.select('.plot').append('svg')
 	.attr('transform','translate('+m.l+','+m.t+')');
 
 var scale = {};
-scale.type = d3.scale.ordinal().domain(['Sal¢n Tradicional','Sal¢n VERB','Sal¢n NODE','Otro']).range(['#F05A28','#90D3CF','#C1F5FF','#D8D8D8']);
-scale.occupancy = d3.scale.linear().domain([0,.5,1]).range(['blue','purple','red']);
-scale.schools = d3.scale.category20();
+scale.occupancy = d3.scale.linear().domain([0,.7,1]).range(['blue','white','red']);
 
 //map for room data lookup based on room id
-var roomMap = d3.map();
+var roomMap = d3.map(),
+    divCode = d3.map();
 
 //timeticks
 var timeTicks = d3.range(6).map(function(d,i){
@@ -39,7 +38,7 @@ var timeTicks = d3.range(6).map(function(d,i){
 		]
 	});
 
-//draw legend
+//draw day and time legend at the top
 var legend = svg.append('g').attr('class','legend').attr('transform','translate('+x2+',-30)')
 	.selectAll('.legend-group')
 	.data(timeTicks)
@@ -55,13 +54,12 @@ ticks.append('line').attr('y1',13).attr('y2',15).style('stroke-width',1).style('
 ticks.append('text').text(function(t){return t.time}).attr('text-anchor','middle');
 
 
-
 //Import data
 d3_queue.queue()
-	.defer(d3.csv,'../00_data/classrooms/Classrooms CCM,CEM,GDA,MTY,QRO,CSF -AD14.csv',parse)
-	.defer(d3.csv,'../00_data/course-enrollment/GDA-Courses information Ago-Dic-2015_schedule.csv',parseCourse)
-	.await(dataLoaded);
-
+	.defer(d3.csv,'../00_data/cem/instructional-space-only/Classrooms CCM,CEM,GDA,MTY,QRO,CSF -AD14.csv',parse)
+	.defer(d3.tsv,'../00_data/cem/schedule/CourseSchedule_DSE Schedule 201513.tsv',parseCourse)
+    .defer(d3.csv,'../00_data/cem/metadata-divisions.csv',parseDivMetadata)
+    .await(dataLoaded);
 
 
 function dataLoaded(err, rooms, coursesData){
@@ -72,10 +70,6 @@ function dataLoaded(err, rooms, coursesData){
 				.entries(rooms)
 		}
 	computeMetrics(roomsData); //computes roomCount, capacity for each node; modify in place
-
-	//Discover unique schools
-	var schools = d3.nest().key(function(d){return d.school}).map(coursesData,d3.map).keys();
-	scale.schools.domain(schools);
 
 
 	//Draw blocks to represent rooms
@@ -116,7 +110,13 @@ function dataLoaded(err, rooms, coursesData){
 
 	
 	//Draw courses; only courses that has correct room assignments
-	var courses = svg.selectAll('.course')
+    //data discovery of courses
+    console.log(coursesData);
+    console.log(d3.nest().key(function(d){return d.div}).map(coursesData,d3.map).keys())
+    console.log(coursesData.filter(function(c){return !c.enrollment || !c.room}));
+
+
+    var courses = svg.selectAll('.course')
 		.data(coursesData)
 		.enter()
 		.append('g').attr('class','course')
@@ -142,15 +142,17 @@ function dataLoaded(err, rooms, coursesData){
 				.attr('x',function(m){ return timeScale(m[0]); })
 				.attr('width',function(m){ return timeScale(m[1]) - timeScale(m[0]); })
 				.attr('height',room.h)
-				.style('fill',scale.schools(c.school))
-				//.style('fill', scale.occupancy( room.capacity?c.enrollment/room.capacity:0 ) )
+                .style('fill', config.colorByDivision( divCode.get(c.div) ))
+                //.style('fill', scale.occupancy(c.enrollment/ room.capacity))
+                .on('click',function(){ console.log(c) });
+
 		})
 
 }
 
 
 function parse(d){
-	if(d.Campus != "GDA") return;
+	if(d.Campus != "EDM") return; //instructional space dataset identifies CEM as EDM instead
 
 	return {
 		campus:d.Campus,
@@ -163,28 +165,36 @@ function parse(d){
 }
 
 function parseCourse(d){
-	if(!d.HoraInicio || !d['Days of the week']) return; //probably ghost courses
+	//if(!d.HoraInicio || !d['Days of the week']) return; //probably ghost courses
 
 	var course = {};
 
-	course.school = d.Escuela;
-	course.div = d.Division;
-	course.dept = d.Departamento;
+	course.div = d['Division'];
+	course.dept = d.DEPARTAMENTO;
 	course.CRN = d.CRN;
-	course.room = d['Inventory Room_ID'];
-	course.enrollment = +d.Alu_Inscritos;
+    course.name = d['NOMBRE DE LA MATERIA'];
+	course.room = d['Room ID'];
+	course.enrollment = +d['Enrollment'];
 	course.meetings = [];
+    course.startTime = d['HORA INICIO DE CLASE'].split(':');
+    course.endTime = d['HORA FIN DE CLASE'].split(':');
+    course.days = d['DAYS'].split('');
+    //course.roomSize = +d['CAPACIDAD MçXIMA'];
 
-	var t0 = Math.floor(+d.HoraInicio/100) + (+d.HoraInicio%100/60),
-		t1 = Math.floor(+d.HoraFin/100) + (+d.HoraFin%100/60);
-	if(d.Lunes) course.meetings.push([{day:0,time:t0},{day:0,time:t1}]);
-	if(d.Martes) course.meetings.push([{day:1,time:t0},{day:1,time:t1}]);
-	if(d.Miercoles) course.meetings.push([{day:2,time:t0},{day:2,time:t1}]);
-	if(d.Jueves) course.meetings.push([{day:3,time:t0},{day:3,time:t1}]);
-	if(d.Viernes) course.meetings.push([{day:4,time:t0},{day:4,time:t1}]);
-	if(d.Sabado) course.meetings.push([{day:5,time:t0},{day:5,time:t1}]);
+	var t0 = (+course.startTime[0]) + (+course.startTime[1]/60),
+		t1 = (+course.endTime[0]) + (+course.endTime[1]/60);
+	if(course.days.indexOf('M')>-1) course.meetings.push([{day:0,time:t0},{day:0,time:t1}]);
+	if(course.days.indexOf('T')>-1) course.meetings.push([{day:1,time:t0},{day:1,time:t1}]);
+	if(course.days.indexOf('W')>-1) course.meetings.push([{day:2,time:t0},{day:2,time:t1}]);
+	if(course.days.indexOf('R')>-1) course.meetings.push([{day:3,time:t0},{day:3,time:t1}]);
+	if(course.days.indexOf('F')>-1) course.meetings.push([{day:4,time:t0},{day:4,time:t1}]);
+	if(course.days.indexOf('S')>-1) course.meetings.push([{day:5,time:t0},{day:5,time:t1}]);
 
 	return course;
+}
+
+function parseDivMetadata(d){
+    divCode.set(d.division, d.code);
 }
 
 function computeMetrics(root){
